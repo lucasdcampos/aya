@@ -78,7 +78,6 @@ public class Board
 
         if (move.Flag == MoveFlag.EnPassant)
         {
-            // The captured pawn is on the same file as the destination, but on the starting rank
             capturedPiece = _squares[move.ToFile, move.FromRank];
         }
 
@@ -94,14 +93,26 @@ public class Board
         _squares[move.ToFile, move.ToRank] = piece;
         _squares[move.FromFile, move.FromRank] = Piece.Empty;
 
+        // Handle Special Moves
         if (move.Flag == MoveFlag.EnPassant)
         {
             _squares[move.ToFile, move.FromRank] = Piece.Empty;
         }
+        else if (move.Flag == MoveFlag.Castling)
+        {
+            bool isKingSide = move.ToFile == 6;
+            int rookFromFile = isKingSide ? 7 : 0;
+            int rookToFile = isKingSide ? 5 : 3;
+            int rank = move.ToRank;
+            
+            _squares[rookToFile, rank] = _squares[rookFromFile, rank];
+            _squares[rookFromFile, rank] = Piece.Empty;
+        }
+
+        // Update Castling Rights
+        UpdateCastlingRights(move, piece, capturedPiece);
 
         // Update En Passant for next move
-        int oldEpFile = EnPassantFile;
-        int oldEpRank = EnPassantRank;
         EnPassantFile = -1;
         EnPassantRank = -1;
 
@@ -129,6 +140,42 @@ public class Board
         ActiveColor = ActiveColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
     }
 
+    private void UpdateCastlingRights(Move move, Piece movedPiece, Piece capturedPiece)
+    {
+        // If King moves
+        if (movedPiece.Type == PieceType.King)
+        {
+            if (movedPiece.Color == PieceColor.White)
+            {
+                WhiteCanCastleKingSide = false;
+                WhiteCanCastleQueenSide = false;
+            }
+            else
+            {
+                BlackCanCastleKingSide = false;
+                BlackCanCastleQueenSide = false;
+            }
+        }
+
+        // If Rook moves or is captured
+        CheckRookSquare(move.FromFile, move.FromRank);
+        CheckRookSquare(move.ToFile, move.ToRank);
+    }
+
+    private void CheckRookSquare(int file, int rank)
+    {
+        if (rank == 0)
+        {
+            if (file == 7) WhiteCanCastleKingSide = false;
+            if (file == 0) WhiteCanCastleQueenSide = false;
+        }
+        else if (rank == 7)
+        {
+            if (file == 7) BlackCanCastleKingSide = false;
+            if (file == 0) BlackCanCastleQueenSide = false;
+        }
+    }
+
     public void UndoMove(Move move)
     {
         if (_history.Count == 0) return;
@@ -138,15 +185,22 @@ public class Board
 
         // Restore pieces
         _squares[move.FromFile, move.FromRank] = movedPiece;
-        _squares[move.ToFile, move.ToRank] = Piece.Empty;
+        _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
 
         if (move.Flag == MoveFlag.EnPassant)
         {
             _squares[move.ToFile, move.FromRank] = state.CapturedPiece;
+            _squares[move.ToFile, move.ToRank] = Piece.Empty;
         }
-        else
+        else if (move.Flag == MoveFlag.Castling)
         {
-            _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
+            bool isKingSide = move.ToFile == 6;
+            int rookFromFile = isKingSide ? 7 : 0;
+            int rookToFile = isKingSide ? 5 : 3;
+            int rank = move.ToRank;
+            
+            _squares[rookFromFile, rank] = _squares[rookToFile, rank];
+            _squares[rookToFile, rank] = Piece.Empty;
         }
 
         // Restore state

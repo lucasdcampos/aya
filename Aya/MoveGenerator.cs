@@ -77,13 +77,10 @@ public class MoveGenerator
             if (IsOnBoard(capFile, nextRank))
             {
                 Piece target = _board.GetPiece(capFile, nextRank);
-                
-                // Normal capture
                 if (target.Type != PieceType.None && target.Color != color)
                 {
                     _moves.Add(new Move(file, rank, capFile, nextRank));
                 }
-                // En Passant capture
                 else if (capFile == _board.EnPassantFile && nextRank == _board.EnPassantRank)
                 {
                     _moves.Add(new Move(file, rank, capFile, nextRank, MoveFlag.EnPassant));
@@ -162,6 +159,137 @@ public class MoveGenerator
                 }
             }
         }
+
+        GenerateCastlingMoves(file, rank, color);
+    }
+
+    private void GenerateCastlingMoves(int file, int rank, PieceColor color)
+    {
+        if (color == PieceColor.White)
+        {
+            if (rank != 0 || file != 4) return;
+            
+            // White King Side
+            if (_board.WhiteCanCastleKingSide && 
+                _board.GetPiece(5, 0).Type == PieceType.None && 
+                _board.GetPiece(6, 0).Type == PieceType.None &&
+                !IsSquareAttacked(4, 0, PieceColor.Black) &&
+                !IsSquareAttacked(5, 0, PieceColor.Black) &&
+                !IsSquareAttacked(6, 0, PieceColor.Black))
+            {
+                _moves.Add(new Move(4, 0, 6, 0, MoveFlag.Castling));
+            }
+            // White Queen Side
+            if (_board.WhiteCanCastleQueenSide && 
+                _board.GetPiece(1, 0).Type == PieceType.None &&
+                _board.GetPiece(2, 0).Type == PieceType.None && 
+                _board.GetPiece(3, 0).Type == PieceType.None &&
+                !IsSquareAttacked(4, 0, PieceColor.Black) &&
+                !IsSquareAttacked(3, 0, PieceColor.Black) &&
+                !IsSquareAttacked(2, 0, PieceColor.Black))
+            {
+                _moves.Add(new Move(4, 0, 2, 0, MoveFlag.Castling));
+            }
+        }
+        else
+        {
+            if (rank != 7 || file != 4) return;
+
+            // Black King Side
+            if (_board.BlackCanCastleKingSide && 
+                _board.GetPiece(5, 7).Type == PieceType.None && 
+                _board.GetPiece(6, 7).Type == PieceType.None &&
+                !IsSquareAttacked(4, 7, PieceColor.White) &&
+                !IsSquareAttacked(5, 7, PieceColor.White) &&
+                !IsSquareAttacked(6, 7, PieceColor.White))
+            {
+                _moves.Add(new Move(4, 7, 6, 7, MoveFlag.Castling));
+            }
+            // Black Queen Side
+            if (_board.BlackCanCastleQueenSide && 
+                _board.GetPiece(1, 7).Type == PieceType.None &&
+                _board.GetPiece(2, 7).Type == PieceType.None && 
+                _board.GetPiece(3, 7).Type == PieceType.None &&
+                !IsSquareAttacked(4, 7, PieceColor.White) &&
+                !IsSquareAttacked(3, 7, PieceColor.White) &&
+                !IsSquareAttacked(2, 7, PieceColor.White))
+            {
+                _moves.Add(new Move(4, 7, 2, 7, MoveFlag.Castling));
+            }
+        }
+    }
+
+    public bool IsSquareAttacked(int file, int rank, PieceColor attackerColor)
+    {
+        // Knight attacks
+        int[] knF = { 1, 1, -1, -1, 2, 2, -2, -2 };
+        int[] knR = { 2, -2, 2, -2, 1, -1, 1, -1 };
+        for (int i = 0; i < 8; i++)
+        {
+            int f = file + knF[i];
+            int r = rank + knR[i];
+            if (IsOnBoard(f, r))
+            {
+                Piece p = _board.GetPiece(f, r);
+                if (p.Type == PieceType.Knight && p.Color == attackerColor) return true;
+            }
+        }
+
+        // King attacks
+        for (int df = -1; df <= 1; df++)
+        {
+            for (int dr = -1; dr <= 1; dr++)
+            {
+                if (df == 0 && dr == 0) continue;
+                int f = file + df;
+                int r = rank + dr;
+                if (IsOnBoard(f, r))
+                {
+                    Piece p = _board.GetPiece(f, r);
+                    if (p.Type == PieceType.King && p.Color == attackerColor) return true;
+                }
+            }
+        }
+
+        // Pawn attacks
+        int pawnDir = attackerColor == PieceColor.White ? -1 : 1;
+        int[] pawnFiles = { file - 1, file + 1 };
+        foreach (int f in pawnFiles)
+        {
+            int r = rank + pawnDir;
+            if (IsOnBoard(f, r))
+            {
+                Piece p = _board.GetPiece(f, r);
+                if (p.Type == PieceType.Pawn && p.Color == attackerColor) return true;
+            }
+        }
+
+        // Sliding attacks (Rook, Bishop, Queen)
+        if (IsAttackedBySliding(file, rank, attackerColor, new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }, PieceType.Rook)) return true;
+        if (IsAttackedBySliding(file, rank, attackerColor, new[] { (1, 1), (1, -1), (-1, 1), (-1, -1) }, PieceType.Bishop)) return true;
+
+        return false;
+    }
+
+    private bool IsAttackedBySliding(int file, int rank, PieceColor color, (int df, int dr)[] directions, PieceType type)
+    {
+        foreach (var (df, dr) in directions)
+        {
+            int f = file + df;
+            int r = rank + dr;
+            while (IsOnBoard(f, r))
+            {
+                Piece p = _board.GetPiece(f, r);
+                if (p.Type != PieceType.None)
+                {
+                    if (p.Color == color && (p.Type == type || p.Type == PieceType.Queen)) return true;
+                    break;
+                }
+                f += df;
+                r += dr;
+            }
+        }
+        return false;
     }
 
     private bool IsOnBoard(int file, int rank) => file >= 0 && file < 8 && rank >= 0 && rank < 8;
