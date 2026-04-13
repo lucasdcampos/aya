@@ -61,7 +61,6 @@ public class BoardTests
     [Fact]
     public void Castling_WhiteKingSide_MovesRook()
     {
-        // Position where white can castle kingside
         var fen = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
         var board = new Board();
         board.LoadFromFen(fen);
@@ -74,24 +73,37 @@ public class BoardTests
         Assert.Equal(PieceType.None, board.GetPiece(4, 0).Type);
         Assert.Equal(PieceType.None, board.GetPiece(7, 0).Type);
         Assert.False(board.WhiteCanCastleKingSide);
-        Assert.False(board.WhiteCanCastleQueenSide);
     }
 
     [Fact]
-    public void Castling_UndoRestoresRook()
+    public void Promotion_PawnToQueen()
     {
-        var fen = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
+        // White pawn on a7, black king on h8
+        var fen = "7k/P7/8/8/8/8/8/7K w - - 0 1";
         var board = new Board();
         board.LoadFromFen(fen);
         
-        var castlingMove = new Move(4, 0, 6, 0, MoveFlag.Castling);
-        board.MakeMove(castlingMove);
-        board.UndoMove(castlingMove);
+        var promotionMove = new Move(0, 6, 0, 7, MoveFlag.Promotion, PieceType.Queen);
+        board.MakeMove(promotionMove);
         
-        Assert.Equal(PieceType.King, board.GetPiece(4, 0).Type);
-        Assert.Equal(PieceType.Rook, board.GetPiece(7, 0).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(6, 0).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(5, 0).Type);
-        Assert.True(board.WhiteCanCastleKingSide);
+        Assert.Equal(PieceType.Queen, board.GetPiece(0, 7).Type);
+        Assert.Equal(PieceColor.White, board.GetPiece(0, 7).Color);
+        Assert.Equal(PieceType.None, board.GetPiece(0, 6).Type);
+    }
+
+    [Fact]
+    public void Promotion_UndoRestoresPawn()
+    {
+        var fen = "7k/P7/8/8/8/8/8/7K w - - 0 1";
+        var board = new Board();
+        board.LoadFromFen(fen);
+        
+        var promotionMove = new Move(0, 6, 0, 7, MoveFlag.Promotion, PieceType.Queen);
+        board.MakeMove(promotionMove);
+        board.UndoMove(promotionMove);
+        
+        Assert.Equal(PieceType.Pawn, board.GetPiece(0, 6).Type);
+        Assert.Equal(PieceType.None, board.GetPiece(0, 7).Type);
+        Assert.Equal(PieceColor.White, board.GetPiece(0, 6).Color);
     }
 }

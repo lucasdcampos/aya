@@ -90,6 +90,11 @@ public class Board
         ));
 
         // Execute move
+        if (move.Flag == MoveFlag.Promotion)
+        {
+            piece = new Piece(move.PromotionType, piece.Color);
+        }
+
         _squares[move.ToFile, move.ToRank] = piece;
         _squares[move.FromFile, move.FromRank] = Piece.Empty;
 
@@ -142,7 +147,6 @@ public class Board
 
     private void UpdateCastlingRights(Move move, Piece movedPiece, Piece capturedPiece)
     {
-        // If King moves
         if (movedPiece.Type == PieceType.King)
         {
             if (movedPiece.Color == PieceColor.White)
@@ -157,7 +161,6 @@ public class Board
             }
         }
 
-        // If Rook moves or is captured
         CheckRookSquare(move.FromFile, move.FromRank);
         CheckRookSquare(move.ToFile, move.ToRank);
     }
@@ -184,7 +187,15 @@ public class Board
         Piece movedPiece = _squares[move.ToFile, move.ToRank];
 
         // Restore pieces
-        _squares[move.FromFile, move.FromRank] = movedPiece;
+        if (move.Flag == MoveFlag.Promotion)
+        {
+            _squares[move.FromFile, move.FromRank] = new Piece(PieceType.Pawn, movedPiece.Color);
+        }
+        else
+        {
+            _squares[move.FromFile, move.FromRank] = movedPiece;
+        }
+
         _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
 
         if (move.Flag == MoveFlag.EnPassant)

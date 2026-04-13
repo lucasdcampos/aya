@@ -58,16 +58,23 @@ public class MoveGenerator
     {
         int direction = color == PieceColor.White ? 1 : -1;
         int startRank = color == PieceColor.White ? 1 : 6;
+        int promotionRank = color == PieceColor.White ? 7 : 0;
 
         int nextRank = rank + direction;
         if (IsOnBoard(file, nextRank) && _board.GetPiece(file, nextRank).Type == PieceType.None)
         {
-            _moves.Add(new Move(file, rank, file, nextRank));
-            
-            int doubleNextRank = rank + 2 * direction;
-            if (rank == startRank && IsOnBoard(file, doubleNextRank) && _board.GetPiece(file, doubleNextRank).Type == PieceType.None)
+            if (nextRank == promotionRank)
             {
-                _moves.Add(new Move(file, rank, file, doubleNextRank));
+                AddPromotionMoves(file, rank, file, nextRank);
+            }
+            else
+            {
+                _moves.Add(new Move(file, rank, file, nextRank));
+                int doubleNextRank = rank + 2 * direction;
+                if (rank == startRank && IsOnBoard(file, doubleNextRank) && _board.GetPiece(file, doubleNextRank).Type == PieceType.None)
+                {
+                    _moves.Add(new Move(file, rank, file, doubleNextRank));
+                }
             }
         }
 
@@ -79,7 +86,14 @@ public class MoveGenerator
                 Piece target = _board.GetPiece(capFile, nextRank);
                 if (target.Type != PieceType.None && target.Color != color)
                 {
-                    _moves.Add(new Move(file, rank, capFile, nextRank));
+                    if (nextRank == promotionRank)
+                    {
+                        AddPromotionMoves(file, rank, capFile, nextRank);
+                    }
+                    else
+                    {
+                        _moves.Add(new Move(file, rank, capFile, nextRank));
+                    }
                 }
                 else if (capFile == _board.EnPassantFile && nextRank == _board.EnPassantRank)
                 {
@@ -87,6 +101,12 @@ public class MoveGenerator
                 }
             }
         }
+    }
+
+    private void AddPromotionMoves(int fromFile, int fromRank, int toFile, int toRank)
+    {
+        // For now, only promoting to Queen as requested
+        _moves.Add(new Move(fromFile, fromRank, toFile, toRank, MoveFlag.Promotion, PieceType.Queen));
     }
 
     private void GenerateKnightMoves(int file, int rank, PieceColor color)
@@ -169,7 +189,6 @@ public class MoveGenerator
         {
             if (rank != 0 || file != 4) return;
             
-            // White King Side
             if (_board.WhiteCanCastleKingSide && 
                 _board.GetPiece(5, 0).Type == PieceType.None && 
                 _board.GetPiece(6, 0).Type == PieceType.None &&
@@ -179,7 +198,6 @@ public class MoveGenerator
             {
                 _moves.Add(new Move(4, 0, 6, 0, MoveFlag.Castling));
             }
-            // White Queen Side
             if (_board.WhiteCanCastleQueenSide && 
                 _board.GetPiece(1, 0).Type == PieceType.None &&
                 _board.GetPiece(2, 0).Type == PieceType.None && 
@@ -195,7 +213,6 @@ public class MoveGenerator
         {
             if (rank != 7 || file != 4) return;
 
-            // Black King Side
             if (_board.BlackCanCastleKingSide && 
                 _board.GetPiece(5, 7).Type == PieceType.None && 
                 _board.GetPiece(6, 7).Type == PieceType.None &&
@@ -205,7 +222,6 @@ public class MoveGenerator
             {
                 _moves.Add(new Move(4, 7, 6, 7, MoveFlag.Castling));
             }
-            // Black Queen Side
             if (_board.BlackCanCastleQueenSide && 
                 _board.GetPiece(1, 7).Type == PieceType.None &&
                 _board.GetPiece(2, 7).Type == PieceType.None && 
@@ -221,7 +237,6 @@ public class MoveGenerator
 
     public bool IsSquareAttacked(int file, int rank, PieceColor attackerColor)
     {
-        // Knight attacks
         int[] knF = { 1, 1, -1, -1, 2, 2, -2, -2 };
         int[] knR = { 2, -2, 2, -2, 1, -1, 1, -1 };
         for (int i = 0; i < 8; i++)
@@ -235,7 +250,6 @@ public class MoveGenerator
             }
         }
 
-        // King attacks
         for (int df = -1; df <= 1; df++)
         {
             for (int dr = -1; dr <= 1; dr++)
@@ -251,7 +265,6 @@ public class MoveGenerator
             }
         }
 
-        // Pawn attacks
         int pawnDir = attackerColor == PieceColor.White ? -1 : 1;
         int[] pawnFiles = { file - 1, file + 1 };
         foreach (int f in pawnFiles)
@@ -264,7 +277,6 @@ public class MoveGenerator
             }
         }
 
-        // Sliding attacks (Rook, Bishop, Queen)
         if (IsAttackedBySliding(file, rank, attackerColor, new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }, PieceType.Rook)) return true;
         if (IsAttackedBySliding(file, rank, attackerColor, new[] { (1, 1), (1, -1), (-1, 1), (-1, -1) }, PieceType.Bishop)) return true;
 
