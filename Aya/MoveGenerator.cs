@@ -10,6 +10,47 @@ public class MoveGenerator
         _board = board;
     }
 
+    public IEnumerable<Move> GenerateLegalMoves()
+    {
+        var pseudoMoves = GeneratePseudoLegalMoves().ToList();
+        var legalMoves = new List<Move>();
+
+        PieceColor movingColor = _board.ActiveColor;
+        PieceColor opponentColor = movingColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
+        foreach (var move in pseudoMoves)
+        {
+            _board.MakeMove(move);
+            
+            var (kingFile, kingRank) = FindKing(movingColor);
+            
+            if (!IsSquareAttacked(kingFile, kingRank, opponentColor))
+            {
+                legalMoves.Add(move);
+            }
+
+            _board.UndoMove(move);
+        }
+
+        return legalMoves;
+    }
+
+    private (int file, int rank) FindKing(PieceColor color)
+    {
+        for (int file = 0; file < 8; file++)
+        {
+            for (int rank = 0; rank < 8; rank++)
+            {
+                Piece p = _board.GetPiece(file, rank);
+                if (p.Type == PieceType.King && p.Color == color)
+                {
+                    return (file, rank);
+                }
+            }
+        }
+        return (-1, -1);
+    }
+
     public IEnumerable<Move> GeneratePseudoLegalMoves()
     {
         _moves.Clear();
@@ -105,7 +146,6 @@ public class MoveGenerator
 
     private void AddPromotionMoves(int fromFile, int fromRank, int toFile, int toRank)
     {
-        // For now, only promoting to Queen as requested
         _moves.Add(new Move(fromFile, fromRank, toFile, toRank, MoveFlag.Promotion, PieceType.Queen));
     }
 
@@ -185,6 +225,8 @@ public class MoveGenerator
 
     private void GenerateCastlingMoves(int file, int rank, PieceColor color)
     {
+        PieceColor opponentColor = color == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
         if (color == PieceColor.White)
         {
             if (rank != 0 || file != 4) return;
@@ -192,9 +234,9 @@ public class MoveGenerator
             if (_board.WhiteCanCastleKingSide && 
                 _board.GetPiece(5, 0).Type == PieceType.None && 
                 _board.GetPiece(6, 0).Type == PieceType.None &&
-                !IsSquareAttacked(4, 0, PieceColor.Black) &&
-                !IsSquareAttacked(5, 0, PieceColor.Black) &&
-                !IsSquareAttacked(6, 0, PieceColor.Black))
+                !IsSquareAttacked(4, 0, opponentColor) &&
+                !IsSquareAttacked(5, 0, opponentColor) &&
+                !IsSquareAttacked(6, 0, opponentColor))
             {
                 _moves.Add(new Move(4, 0, 6, 0, MoveFlag.Castling));
             }
@@ -202,9 +244,9 @@ public class MoveGenerator
                 _board.GetPiece(1, 0).Type == PieceType.None &&
                 _board.GetPiece(2, 0).Type == PieceType.None && 
                 _board.GetPiece(3, 0).Type == PieceType.None &&
-                !IsSquareAttacked(4, 0, PieceColor.Black) &&
-                !IsSquareAttacked(3, 0, PieceColor.Black) &&
-                !IsSquareAttacked(2, 0, PieceColor.Black))
+                !IsSquareAttacked(4, 0, opponentColor) &&
+                !IsSquareAttacked(3, 0, opponentColor) &&
+                !IsSquareAttacked(2, 0, opponentColor))
             {
                 _moves.Add(new Move(4, 0, 2, 0, MoveFlag.Castling));
             }
@@ -216,9 +258,9 @@ public class MoveGenerator
             if (_board.BlackCanCastleKingSide && 
                 _board.GetPiece(5, 7).Type == PieceType.None && 
                 _board.GetPiece(6, 7).Type == PieceType.None &&
-                !IsSquareAttacked(4, 7, PieceColor.White) &&
-                !IsSquareAttacked(5, 7, PieceColor.White) &&
-                !IsSquareAttacked(6, 7, PieceColor.White))
+                !IsSquareAttacked(4, 7, opponentColor) &&
+                !IsSquareAttacked(5, 7, opponentColor) &&
+                !IsSquareAttacked(6, 7, opponentColor))
             {
                 _moves.Add(new Move(4, 7, 6, 7, MoveFlag.Castling));
             }
@@ -226,9 +268,9 @@ public class MoveGenerator
                 _board.GetPiece(1, 7).Type == PieceType.None &&
                 _board.GetPiece(2, 7).Type == PieceType.None && 
                 _board.GetPiece(3, 7).Type == PieceType.None &&
-                !IsSquareAttacked(4, 7, PieceColor.White) &&
-                !IsSquareAttacked(3, 7, PieceColor.White) &&
-                !IsSquareAttacked(2, 7, PieceColor.White))
+                !IsSquareAttacked(4, 7, opponentColor) &&
+                !IsSquareAttacked(3, 7, opponentColor) &&
+                !IsSquareAttacked(2, 7, opponentColor))
             {
                 _moves.Add(new Move(4, 7, 2, 7, MoveFlag.Castling));
             }

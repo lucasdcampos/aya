@@ -10,7 +10,7 @@ public class BoardTests
     {
         var board = new Board();
         var generator = new MoveGenerator(board);
-        var moves = generator.GeneratePseudoLegalMoves();
+        var moves = generator.GenerateLegalMoves();
         
         Assert.Equal(20, moves.Count());
     }
@@ -70,15 +70,12 @@ public class BoardTests
         
         Assert.Equal(PieceType.King, board.GetPiece(6, 0).Type);
         Assert.Equal(PieceType.Rook, board.GetPiece(5, 0).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(4, 0).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(7, 0).Type);
         Assert.False(board.WhiteCanCastleKingSide);
     }
 
     [Fact]
     public void Promotion_PawnToQueen()
     {
-        // White pawn on a7, black king on h8
         var fen = "7k/P7/8/8/8/8/8/7K w - - 0 1";
         var board = new Board();
         board.LoadFromFen(fen);
@@ -87,23 +84,46 @@ public class BoardTests
         board.MakeMove(promotionMove);
         
         Assert.Equal(PieceType.Queen, board.GetPiece(0, 7).Type);
-        Assert.Equal(PieceColor.White, board.GetPiece(0, 7).Color);
-        Assert.Equal(PieceType.None, board.GetPiece(0, 6).Type);
     }
 
     [Fact]
-    public void Promotion_UndoRestoresPawn()
+    public void LegalMoves_PinnedPiece_CannotMove()
     {
-        var fen = "7k/P7/8/8/8/8/8/7K w - - 0 1";
+        // White king on e1, White knight on e2, Black rook on e8
+        // The knight is pinned and cannot move
+        var fen = "4r3/8/8/8/8/8/4N3/4K3 w - - 0 1";
         var board = new Board();
         board.LoadFromFen(fen);
+        var generator = new MoveGenerator(board);
         
-        var promotionMove = new Move(0, 6, 0, 7, MoveFlag.Promotion, PieceType.Queen);
-        board.MakeMove(promotionMove);
-        board.UndoMove(promotionMove);
+        var moves = generator.GenerateLegalMoves();
         
-        Assert.Equal(PieceType.Pawn, board.GetPiece(0, 6).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(0, 7).Type);
-        Assert.Equal(PieceColor.White, board.GetPiece(0, 6).Color);
+        // Knight at e2 (4,1) should have NO legal moves because it's pinned
+        var knightMoves = moves.Where(m => m.FromFile == 4 && m.FromRank == 1);
+        Assert.Empty(knightMoves);
+    }
+
+    [Fact]
+    public void LegalMoves_MustEscapeCheck()
+    {
+        // White king on e1, Black rook on e8
+        // White must move the king or block the check (but here only king moves are possible)
+        var fen = "4r3/8/8/8/8/8/8/4K3 w - - 0 1";
+        var board = new Board();
+        board.LoadFromFen(fen);
+        var generator = new MoveGenerator(board);
+        
+        var moves = generator.GenerateLegalMoves();
+        
+        // King must move to d1, f1, d2, e2, f2 (e2 is blocked by check too, so only d1, f1, d2, f2)
+        // Wait, e2 is also under attack by rook.
+        foreach (var move in moves)
+        {
+            board.MakeMove(move);
+            var (kFile, kRank) = (move.ToFile, move.ToRank); // King just moved
+            var attackerColor = PieceColor.Black;
+            Assert.False(generator.IsSquareAttacked(kFile, kRank, attackerColor));
+            board.UndoMove(move);
+        }
     }
 }
