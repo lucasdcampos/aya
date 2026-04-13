@@ -4,6 +4,8 @@ import chess.engine
 import os
 import sys
 import argparse
+import threading
+import queue
 
 from constants import DEFAULT_ENGINE_PATH, WIDTH, HEIGHT, WINDOW_WIDTH, SQ_SIZE
 from renderer import load_images, draw_board, draw_highlights, draw_pieces
@@ -11,33 +13,35 @@ from ui import draw_sidebar, draw_game_over
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Aya Chess Engine GUI")
-    parser.add_argument(
-        "--engine", 
-        type=str, 
-        default=None, 
-        help="Path to the UCI engine executable"
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["human-vs-engine", "engine-vs-engine"],
-        default="human-vs-engine",
-        help="Select game mode: human-vs-engine (default) or engine-vs-engine"
-    )
+    parser.add_argument("--engine", type=str, default=None, help="Path to the UCI engine executable")
+    parser.add_argument("--mode", choices=["human-vs-engine", "engine-vs-engine"], default="human-vs-engine", help="Game mode")
     return parser.parse_args()
+
+class EngineThread(threading.Thread):
+    """Thread to handle engine calculations without blocking the UI."""
+    def __init__(self, engine, board, result_queue, limit):
+        super().__init__()
+        self.engine = engine
+        self.board = board.copy()
+        self.result_queue = result_queue
+        self.limit = limit
+
+    def run(self):
+        try:
+            result = self.engine.play(self.board, self.limit)
+            self.result_queue.put(result)
+        except Exception as e:
+            self.result_queue.put(e)
 
 def main():
     args = parse_args()
-    
-    # 1. Resolve Engine Path
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    if args.engine:
-        engine_path = os.path.abspath(args.engine)
-    else:
-        engine_path = os.path.normpath(os.path.join(script_dir, DEFAULT_ENGINE_PATH))
+    engine_path = os.path.abspath(args.engine) if args.engine else os.path.normpath(os.path.join(script_dir, DEFAULT_ENGINE_PATH))
     
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, HEIGHT))
     pygame.display.set_caption(f"Aya Chess Engine - GUI ({args.mode})")
+    clock = pygame.time.Clock()
     
     font = pygame.font.SysFont("Arial", 24, bold=True)
     small_font = pygame.font.SysFont("Arial", 18)
@@ -47,7 +51,7 @@ def main():
     
     try:
         if not os.path.exists(engine_path):
-            raise FileNotFoundError(f"Engine executable not found at: {engine_path}")
+            raise FileNotFoundError(f"Engine not found: {engine_path}")
         engine = chess.engine.SimpleEngine.popen_uci(engine_path)
     except Exception as e:
         print(f"Error starting engine: {e}")
@@ -56,113 +60,89 @@ def main():
 
     selected_sq = None
     running = True
-    engine_info = {
-        "score": 0,
-        "bestmove": None,
-        "nodes": 0
-    }
+    engine_thinking = False
+    result_queue = queue.Queue()
+    engine_info = {"score": 0, "bestmove": None, "nodes": 0}
 
     while running:
-        # 1. DRAWING FIRST (Ensure UI reflects latest board state immediately)
-        draw_board(screen)
-        draw_highlights(screen, board, selected_sq)
-        draw_pieces(screen, board)
-        draw_sidebar(screen, font, small_font, board, engine_info)
-        
-        if board.is_game_over():
-            draw_game_over(screen, board, WIDTH, HEIGHT)
-        
-        pygame.display.flip()
-
-        # 2. Event Handling
-        human_moved = False
+        # 1. Event Handling (Always responsive)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            if args.mode == "human-vs-engine" and board.turn == chess.WHITE and not board.is_game_over():
+            if not engine_thinking and args.mode == "human-vs-engine" and board.turn == chess.WHITE and not board.is_game_over():
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     location = pygame.mouse.get_pos()
                     if location[0] < WIDTH:
-                        col = location[0] // SQ_SIZE
-                        row = 7 - (location[1] // SQ_SIZE)
+                        col, row = location[0] // SQ_SIZE, 7 - (location[1] // SQ_SIZE)
                         sq = chess.square(col, row)
 
                         if selected_sq == sq:
                             selected_sq = None
                         elif selected_sq is not None:
-                            move = None
-                            if board.piece_at(selected_sq) and board.piece_at(selected_sq).piece_type == chess.PAWN:
-                                if row == 7:
-                                    move = chess.Move(selected_sq, sq, promotion=chess.QUEEN)
-
-                            if move is None:
-                                move = chess.Move(selected_sq, sq)
+                            move = chess.Move(selected_sq, sq)
+                            if board.piece_at(selected_sq) and board.piece_at(selected_sq).piece_type == chess.PAWN and row == 7:
+                                move = chess.Move(selected_sq, sq, promotion=chess.QUEEN)
 
                             if move in board.legal_moves:
                                 board.push(move)
                                 selected_sq = None
-                                human_moved = True
+                                # Start analysis for the new position in background
+                                engine_thinking = True
+                                EngineThread(engine, board, result_queue, chess.engine.Limit(depth=4)).start()
                             else:
-                                target_piece = board.piece_at(sq)
-                                if target_piece and target_piece.color == chess.WHITE:
-                                    selected_sq = sq
-                                else:
-                                    selected_sq = None
+                                p = board.piece_at(sq)
+                                selected_sq = sq if p and p.color == chess.WHITE else None
                         else:
-                            piece = board.piece_at(sq)
-                            if piece and piece.color == chess.WHITE:
+                            p = board.piece_at(sq)
+                            if p and p.color == chess.WHITE:
                                 selected_sq = sq
 
-        if not running: break
+        # 2. Check for Engine Results
+        if engine_thinking:
+            try:
+                result = result_queue.get_nowait()
+                engine_thinking = False
+                
+                if isinstance(result, Exception):
+                    print(f"Engine Error: {result}")
+                else:
+                    if result.info:
+                        info = result.info
+                        if "score" in info:
+                            engine_info["score"] = info["score"].white().score(mate_score=100000)
+                        if "nodes" in info:
+                            engine_info["nodes"] = info["nodes"]
+                        if "pv" in info:
+                            engine_info["bestmove"] = info["pv"][0].uci()
+                        elif result.move:
+                            engine_info["bestmove"] = result.move.uci()
+                    
+                    # If it was the engine's turn to play, push the move
+                    if board.turn == chess.BLACK or args.mode == "engine-vs-engine":
+                        if result.move:
+                            board.push(result.move)
+            except queue.Empty:
+                pass
 
-        # If human moved, we redraw ONCE more to show the piece at target before engine starts
-        if human_moved:
-            # Immediate feedback redraw
-            draw_board(screen)
-            draw_highlights(screen, board, selected_sq)
-            draw_pieces(screen, board)
-            draw_sidebar(screen, font, small_font, board, engine_info)
-            pygame.display.flip()
-
-            # Sync update stats (briefly blocks, but AFTER move is visible)
-            info = engine.analyse(board, chess.engine.Limit(depth=4))
-            if "score" in info:
-                engine_info["score"] = info["score"].white().score(mate_score=100000)
-            if "nodes" in info:
-                engine_info["nodes"] = info["nodes"]
-            if "pv" in info:
-                engine_info["bestmove"] = info["pv"][0].uci()
-
-        # 3. Game Logic & Engine Turn
-        if not board.is_game_over():
-            is_engine_turn = False
-            if args.mode == "engine-vs-engine":
-                is_engine_turn = True
-            elif args.mode == "human-vs-engine" and board.turn == chess.BLACK:
-                is_engine_turn = True
-
+        # 3. Start Engine Turn if needed
+        if not board.is_game_over() and not engine_thinking:
+            is_engine_turn = (args.mode == "engine-vs-engine") or (board.turn == chess.BLACK)
             if is_engine_turn:
-                # Small delay so move is visible
-                pygame.time.delay(200)
+                engine_thinking = True
+                # Delay for visual flow (handled inside the loop to stay responsive)
+                threading.Timer(0.2, lambda: EngineThread(engine, board, result_queue, chess.engine.Limit(depth=4)).start()).start()
 
-                # Play with a limit and capture info
-                result = engine.play(board, chess.engine.Limit(depth=4))
-
-                if result.info:
-                    info = result.info
-                    if "score" in info:
-                        # Normalize to White perspective: positive = white winning
-                        engine_info["score"] = info["score"].white().score(mate_score=100000)
-                    if "nodes" in info:
-                        engine_info["nodes"] = info["nodes"]
-                    if "pv" in info:
-                        engine_info["bestmove"] = info["pv"][0].uci()
-                    elif result.move:
-                        engine_info["bestmove"] = result.move.uci()
-
-                if result.move:
-                    board.push(result.move)
+        # 4. Drawing
+        draw_board(screen)
+        draw_highlights(screen, board, selected_sq)
+        draw_pieces(screen, board)
+        draw_sidebar(screen, font, small_font, board, engine_info)
+        if board.is_game_over():
+            draw_game_over(screen, board, WIDTH, HEIGHT)
+        
+        pygame.display.flip()
+        clock.tick(60) # Maintain 60 FPS for smooth UI
 
     engine.quit()
     pygame.quit()
