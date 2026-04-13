@@ -12,8 +12,14 @@ public class MoveGenerator
 
     public GameStatus GetGameStatus()
     {
+        // 1. Check repetition
+        if (_board.GetPositionOccurrenceCount(_board.GetPositionKey()) >= 3)
+        {
+            return GameStatus.DrawByRepetition;
+        }
+
+        // 2. Check moves
         var legalMoves = GenerateLegalMoves().ToList();
-        
         if (!legalMoves.Any())
         {
             if (IsInCheck(_board.ActiveColor))
@@ -23,11 +29,13 @@ public class MoveGenerator
             return GameStatus.Stalemate;
         }
 
-        if (_board.HalfmoveClock >= 100) // 50 full moves (100 half moves)
+        // 3. Check 50-move rule
+        if (_board.HalfmoveClock >= 100)
         {
             return GameStatus.DrawByFiftyMoveRule;
         }
 
+        // 4. Check material
         if (_board.HasInsufficientMaterial())
         {
             return GameStatus.DrawByInsufficientMaterial;

@@ -4,6 +4,7 @@ public class Board
 {
     private readonly Piece[,] _squares = new Piece[8, 8];
     private readonly Stack<GameState> _history = new();
+    private readonly List<string> _positionHistory = new();
     
     public PieceColor ActiveColor { get; private set; }
     public bool WhiteCanCastleKingSide { get; private set; }
@@ -69,50 +70,113 @@ public class Board
         {
             FullmoveNumber = fullmove;
         }
+
+        _positionHistory.Clear();
+        _positionHistory.Add(GetPositionKey());
+    }
+
+    public string GetPositionKey()
+    {
+        var fen = new System.Text.StringBuilder();
+
+        // 1. Piece placement
+        for (int rank = 7; rank >= 0; rank--)
+        {
+            int emptySquares = 0;
+            for (int file = 0; file < 8; file++)
+            {
+                Piece piece = _squares[file, rank];
+                if (piece.Type == PieceType.None)
+                {
+                    emptySquares++;
+                }
+                else
+                {
+                    if (emptySquares > 0)
+                    {
+                        fen.Append(emptySquares);
+                        emptySquares = 0;
+                    }
+                    fen.Append(PieceToChar(piece));
+                }
+            }
+            if (emptySquares > 0) fen.Append(emptySquares);
+            if (rank > 0) fen.Append('/');
+        }
+
+        // 2. Active color
+        fen.Append($" {(ActiveColor == PieceColor.White ? 'w' : 'b')}");
+
+        // 3. Castling rights
+        fen.Append(" ");
+        string castling = "";
+        if (WhiteCanCastleKingSide) castling += "K";
+        if (WhiteCanCastleQueenSide) castling += "Q";
+        if (BlackCanCastleKingSide) castling += "k";
+        if (BlackCanCastleQueenSide) castling += "q";
+        fen.Append(string.IsNullOrEmpty(castling) ? "-" : castling);
+
+        // 4. En Passant target
+        fen.Append(" ");
+        if (EnPassantFile != -1)
+        {
+            fen.Append((char)('a' + EnPassantFile));
+            fen.Append(EnPassantRank + 1);
+        }
+        else
+        {
+            fen.Append("-");
+        }
+
+        return fen.ToString();
+    }
+
+    public int GetPositionOccurrenceCount(string key)
+    {
+        int count = 0;
+        foreach (var p in _positionHistory)
+        {
+            if (p == key) count++;
+        }
+        return count;
+    }
+
+    public string GetCurrentFen()
+    {
+        return $"{GetPositionKey()} {HalfmoveClock} {FullmoveNumber}";
+    }
+
+    private char PieceToChar(Piece p)
+    {
+        char c = p.Type switch
+        {
+            PieceType.Pawn => 'P',
+            PieceType.Knight => 'N',
+            PieceType.Bishop => 'B',
+            PieceType.Rook => 'R',
+            PieceType.Queen => 'Q',
+            PieceType.King => 'K',
+            _ => '?'
+        };
+        return p.Color == PieceColor.White ? c : char.ToLower(c);
     }
 
     public bool HasInsufficientMaterial()
     {
         int whitePieces = 0;
         int blackPieces = 0;
-        int whiteBishops = 0;
-        int whiteKnights = 0;
-        int blackBishops = 0;
-        int blackKnights = 0;
-
         for (int file = 0; file < 8; file++)
         {
             for (int rank = 0; rank < 8; rank++)
             {
                 Piece p = _squares[file, rank];
                 if (p.Type == PieceType.None || p.Type == PieceType.King) continue;
-
-                if (p.Color == PieceColor.White)
-                {
-                    whitePieces++;
-                    if (p.Type == PieceType.Bishop) whiteBishops++;
-                    else if (p.Type == PieceType.Knight) whiteKnights++;
-                    else return false; // Pawn, Rook or Queen exists
-                }
-                else
-                {
-                    blackPieces++;
-                    if (p.Type == PieceType.Bishop) blackBishops++;
-                    else if (p.Type == PieceType.Knight) blackKnights++;
-                    else return false;
-                }
+                if (p.Color == PieceColor.White) whitePieces++;
+                else blackPieces++;
+                if (p.Type != PieceType.Bishop && p.Type != PieceType.Knight) return false;
             }
         }
-
-        // K vs K
-        if (whitePieces == 0 && blackPieces == 0) return true;
-        
-        // K+B vs K or K+N vs K
-        if (whitePieces == 1 && blackPieces == 0) return true;
-        if (whitePieces == 0 && blackPieces == 1) return true;
-        
-        // K+B vs K+B (same color bishops not handled here for simplicity, but this is a good start)
-        return false;
+        return whitePieces <= 1 && blackPieces <= 1;
     }
 
     public void MakeMove(Move move)
@@ -181,6 +245,9 @@ public class Board
         }
 
         ActiveColor = ActiveColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
+        // Add to history
+        _positionHistory.Add(GetPositionKey());
     }
 
     private void UpdateCastlingRights(Move move, Piece movedPiece, Piece capturedPiece)
@@ -198,7 +265,6 @@ public class Board
                 BlackCanCastleQueenSide = false;
             }
         }
-
         CheckRookSquare(move.FromFile, move.FromRank);
         CheckRookSquare(move.ToFile, move.ToRank);
     }
@@ -220,9 +286,11 @@ public class Board
     public void UndoMove(Move move)
     {
         if (_history.Count == 0) return;
-
         GameState state = _history.Pop();
         Piece movedPiece = _squares[move.ToFile, move.ToRank];
+
+        // Remove from history
+        _positionHistory.RemoveAt(_positionHistory.Count - 1);
 
         if (move.Flag == MoveFlag.Promotion)
         {

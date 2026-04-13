@@ -1,27 +1,43 @@
 using Aya;
 
-Console.WriteLine("Aya - Chess Engine (Game Status Test)");
-Console.WriteLine("-------------------------------------");
+Console.WriteLine("Aya - Engine vs Engine");
+Console.WriteLine("----------------------");
 
 var board = new Board();
 var generator = new MoveGenerator(board);
+var search = new Search(board);
+int depth = 3;
 
-// 1. Checkmate test (Scholar's Mate)
-Console.WriteLine("\nTesting Checkmate (Scholar's Mate):");
-board.LoadFromFen("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4");
-var mateMove = new Move(5, 2, 5, 6); // f3 to f7
-board.MakeMove(mateMove);
-board.Print();
-Console.WriteLine($"Status: {generator.GetGameStatus()}");
+while (true)
+{
+    Console.Clear();
+    Console.WriteLine($"Aya - Engine vs Engine (Depth: {depth})");
+    Console.WriteLine("-------------------------------------");
+    board.Print();
 
-// 2. Stalemate test (Rei em a8, Dama em c7, Rei em a6)
-Console.WriteLine("\nTesting Stalemate:");
-board.LoadFromFen("k7/2Q5/K7/8/8/8/8/8 b - - 0 1");
-board.Print();
-Console.WriteLine($"Status: {generator.GetGameStatus()}");
+    var status = generator.GetGameStatus();
+    if (status != GameStatus.InProgress)
+    {
+        Console.WriteLine($"\nGame Over: {status}");
+        break;
+    }
 
-// 3. Insufficient Material test
-Console.WriteLine("\nTesting Insufficient Material:");
-board.LoadFromFen("k7/8/K7/8/8/8/8/8 w - - 0 1");
-board.Print();
-Console.WriteLine($"Status: {generator.GetGameStatus()}");
+    Console.WriteLine($"\nAya is thinking for {board.ActiveColor}...");
+    search.StartSearch(depth);
+
+    if (search.BestMove.Equals(default(Move)))
+    {
+        Console.WriteLine("Error: No moves found!");
+        break;
+    }
+
+    if (search.UsedBook)
+        Console.WriteLine($"[BOOK] Best Move: {search.BestMove}");
+    else
+        Console.WriteLine($"[SEARCH] Best Move: {search.BestMove} (Nodes: {search.NodesEvaluated})");
+
+    board.MakeMove(search.BestMove);
+    
+    // Small delay to follow the moves
+    //Thread.Sleep(800);
+}

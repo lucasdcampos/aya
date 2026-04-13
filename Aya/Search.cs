@@ -8,6 +8,7 @@ public class Search
     
     public Move BestMove { get; private set; }
     public int NodesEvaluated { get; private set; }
+    public bool UsedBook { get; private set; }
 
     public Search(Board board)
     {
@@ -20,9 +21,26 @@ public class Search
     {
         BestMove = default;
         NodesEvaluated = 0;
+        UsedBook = false;
+
+        // 1. Check Opening Book
+        string? bookMoveStr = OpeningBook.GetMove(_board.GetCurrentFen());
+        if (bookMoveStr != null)
+        {
+            var legalMoves = _generator.GenerateLegalMoves().ToList();
+            var bookMove = legalMoves.FirstOrDefault(m => m.ToString() == bookMoveStr);
+            
+            if (!bookMove.Equals(default(Move)))
+            {
+                BestMove = bookMove;
+                UsedBook = true;
+                return _evaluator.Evaluate(_board);
+            }
+        }
         
-        var legalMoves = _generator.GenerateLegalMoves().ToList();
-        if (!legalMoves.Any()) return 0;
+        // 2. Regular Search if no book move
+        var allLegalMoves = _generator.GenerateLegalMoves().ToList();
+        if (!allLegalMoves.Any()) return 0;
 
         int alpha = int.MinValue + 1;
         int beta = int.MaxValue - 1;
@@ -31,7 +49,7 @@ public class Search
         if (maximizing)
         {
             int maxEval = int.MinValue + 1;
-            foreach (var move in legalMoves)
+            foreach (var move in allLegalMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, false);
@@ -49,7 +67,7 @@ public class Search
         else
         {
             int minEval = int.MaxValue - 1;
-            foreach (var move in legalMoves)
+            foreach (var move in allLegalMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, true);

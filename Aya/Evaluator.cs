@@ -9,16 +9,14 @@ public class Evaluator
     private const int QueenValue = 900;
     private const int KingValue = 20000;
 
-    // Piece-Square Tables (PST) - Bonus for piece positioning
-    // Higher values mean the piece "prefers" that square.
-    // Tables are from White's perspective (Rank 1 to 8).
+    // Piece-Square Tables (PST) - Focused on Opening Principles
     
     private static readonly int[] PawnPST = {
         0,  0,  0,  0,  0,  0,  0,  0,
         50, 50, 50, 50, 50, 50, 50, 50,
         10, 10, 20, 30, 30, 20, 10, 10,
-         5,  5, 10, 25, 25, 10,  5,  5,
-         0,  0,  0, 20, 20,  0,  0,  0,
+         5,  5, 15, 30, 30, 15,  5,  5, // Strong center
+         0,  0, 10, 25, 25, 10,  0,  0,
          5, -5,-10,  0,  0,-10, -5,  5,
          5, 10, 10,-20,-20, 10, 10,  5,
          0,  0,  0,  0,  0,  0,  0,  0
@@ -26,13 +24,57 @@ public class Evaluator
 
     private static readonly int[] KnightPST = {
         -50,-40,-30,-30,-30,-30,-40,-50,
-        -40,-20,  0,  0,  0,  0,-20,-40,
-        -30,  0, 10, 15, 15, 10,  0,-30,
-        -30,  5, 15, 20, 20, 15,  5,-30,
-        -30,  0, 15, 20, 20, 15,  0,-30,
-        -30,  5, 10, 15, 15, 10,  5,-30,
         -40,-20,  0,  5,  5,  0,-20,-40,
+        -30,  5, 10, 15, 15, 10,  5,-30,
+        -30,  0, 15, 20, 20, 15,  0,-30,
+        -30,  5, 15, 20, 20, 15,  5,-30,
+        -30,  0, 10, 15, 15, 10,  0,-30,
+        -40,-20,  0,  0,  0,  0,-20,-40,
         -50,-40,-30,-30,-30,-30,-40,-50
+    };
+
+    private static readonly int[] BishopPST = {
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  5,  0,  0,  0,  0,  5,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20
+    };
+
+    private static readonly int[] RookPST = {
+         0,  0,  0,  5,  5,  0,  0,  0,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+         5, 10, 10, 10, 10, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
+    };
+
+    private static readonly int[] QueenPST = {
+        -20,-10,-10, -5, -5,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  5,  5,  5,  5,  5,  0,-10,
+          0,  0,  5,  5,  5,  5,  0, -5,
+         -5,  0,  5,  5,  5,  5,  0, -5,
+        -10,  0,  5,  5,  5,  5,  0,-10,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -20,-10,-10, -5, -5,-10,-10,-20
+    };
+
+    private static readonly int[] KingPST = {
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20  // Prefer corners (G1, C1)
     };
 
     public int Evaluate(Board board)
@@ -78,7 +120,6 @@ public class Evaluator
     {
         int index = rank * 8 + file;
         
-        // If Black, flip the index to use the same table
         if (color == PieceColor.Black)
         {
             index = (7 - rank) * 8 + file;
@@ -88,6 +129,10 @@ public class Evaluator
         {
             PieceType.Pawn => PawnPST[index],
             PieceType.Knight => KnightPST[index],
+            PieceType.Bishop => BishopPST[index],
+            PieceType.Rook => RookPST[index],
+            PieceType.Queen => QueenPST[index],
+            PieceType.King => KingPST[index],
             _ => 0
         };
     }
