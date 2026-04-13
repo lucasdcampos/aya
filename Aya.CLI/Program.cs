@@ -1,4 +1,4 @@
-﻿using Aya;
+using Aya;
 
 var board = new Board();
-board.Hello();
+board.Print();
