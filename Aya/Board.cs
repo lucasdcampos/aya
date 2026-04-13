@@ -71,6 +71,50 @@ public class Board
         }
     }
 
+    public bool HasInsufficientMaterial()
+    {
+        int whitePieces = 0;
+        int blackPieces = 0;
+        int whiteBishops = 0;
+        int whiteKnights = 0;
+        int blackBishops = 0;
+        int blackKnights = 0;
+
+        for (int file = 0; file < 8; file++)
+        {
+            for (int rank = 0; rank < 8; rank++)
+            {
+                Piece p = _squares[file, rank];
+                if (p.Type == PieceType.None || p.Type == PieceType.King) continue;
+
+                if (p.Color == PieceColor.White)
+                {
+                    whitePieces++;
+                    if (p.Type == PieceType.Bishop) whiteBishops++;
+                    else if (p.Type == PieceType.Knight) whiteKnights++;
+                    else return false; // Pawn, Rook or Queen exists
+                }
+                else
+                {
+                    blackPieces++;
+                    if (p.Type == PieceType.Bishop) blackBishops++;
+                    else if (p.Type == PieceType.Knight) blackKnights++;
+                    else return false;
+                }
+            }
+        }
+
+        // K vs K
+        if (whitePieces == 0 && blackPieces == 0) return true;
+        
+        // K+B vs K or K+N vs K
+        if (whitePieces == 1 && blackPieces == 0) return true;
+        if (whitePieces == 0 && blackPieces == 1) return true;
+        
+        // K+B vs K+B (same color bishops not handled here for simplicity, but this is a good start)
+        return false;
+    }
+
     public void MakeMove(Move move)
     {
         Piece piece = _squares[move.FromFile, move.FromRank];
@@ -81,7 +125,6 @@ public class Board
             capturedPiece = _squares[move.ToFile, move.FromRank];
         }
 
-        // Save current state
         _history.Push(new GameState(
             capturedPiece,
             WhiteCanCastleKingSide, WhiteCanCastleQueenSide,
@@ -89,7 +132,6 @@ public class Board
             EnPassantFile, EnPassantRank, HalfmoveClock
         ));
 
-        // Execute move
         if (move.Flag == MoveFlag.Promotion)
         {
             piece = new Piece(move.PromotionType, piece.Color);
@@ -98,7 +140,6 @@ public class Board
         _squares[move.ToFile, move.ToRank] = piece;
         _squares[move.FromFile, move.FromRank] = Piece.Empty;
 
-        // Handle Special Moves
         if (move.Flag == MoveFlag.EnPassant)
         {
             _squares[move.ToFile, move.FromRank] = Piece.Empty;
@@ -114,10 +155,8 @@ public class Board
             _squares[rookFromFile, rank] = Piece.Empty;
         }
 
-        // Update Castling Rights
         UpdateCastlingRights(move, piece, capturedPiece);
 
-        // Update En Passant for next move
         EnPassantFile = -1;
         EnPassantRank = -1;
 
@@ -127,7 +166,6 @@ public class Board
             EnPassantRank = (move.FromRank + move.ToRank) / 2;
         }
 
-        // Update counters
         if (piece.Type == PieceType.Pawn || capturedPiece.Type != PieceType.None)
         {
             HalfmoveClock = 0;
@@ -186,7 +224,6 @@ public class Board
         GameState state = _history.Pop();
         Piece movedPiece = _squares[move.ToFile, move.ToRank];
 
-        // Restore pieces
         if (move.Flag == MoveFlag.Promotion)
         {
             _squares[move.FromFile, move.FromRank] = new Piece(PieceType.Pawn, movedPiece.Color);
@@ -214,7 +251,6 @@ public class Board
             _squares[rookToFile, rank] = Piece.Empty;
         }
 
-        // Restore state
         WhiteCanCastleKingSide = state.WhiteCanCastleKingSide;
         WhiteCanCastleQueenSide = state.WhiteCanCastleQueenSide;
         BlackCanCastleKingSide = state.BlackCanCastleKingSide;

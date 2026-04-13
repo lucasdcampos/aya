@@ -10,6 +10,39 @@ public class MoveGenerator
         _board = board;
     }
 
+    public GameStatus GetGameStatus()
+    {
+        var legalMoves = GenerateLegalMoves().ToList();
+        
+        if (!legalMoves.Any())
+        {
+            if (IsInCheck(_board.ActiveColor))
+            {
+                return GameStatus.Checkmate;
+            }
+            return GameStatus.Stalemate;
+        }
+
+        if (_board.HalfmoveClock >= 100) // 50 full moves (100 half moves)
+        {
+            return GameStatus.DrawByFiftyMoveRule;
+        }
+
+        if (_board.HasInsufficientMaterial())
+        {
+            return GameStatus.DrawByInsufficientMaterial;
+        }
+
+        return GameStatus.InProgress;
+    }
+
+    public bool IsInCheck(PieceColor color)
+    {
+        var (file, rank) = FindKing(color);
+        PieceColor opponentColor = color == PieceColor.White ? PieceColor.Black : PieceColor.White;
+        return IsSquareAttacked(file, rank, opponentColor);
+    }
+
     public IEnumerable<Move> GenerateLegalMoves()
     {
         var pseudoMoves = GeneratePseudoLegalMoves().ToList();
@@ -21,31 +54,24 @@ public class MoveGenerator
         foreach (var move in pseudoMoves)
         {
             _board.MakeMove(move);
-            
-            var (kingFile, kingRank) = FindKing(movingColor);
-            
-            if (!IsSquareAttacked(kingFile, kingRank, opponentColor))
+            if (!IsInCheck(movingColor))
             {
                 legalMoves.Add(move);
             }
-
             _board.UndoMove(move);
         }
 
         return legalMoves;
     }
 
-    private (int file, int rank) FindKing(PieceColor color)
+    public (int file, int rank) FindKing(PieceColor color)
     {
         for (int file = 0; file < 8; file++)
         {
             for (int rank = 0; rank < 8; rank++)
             {
                 Piece p = _board.GetPiece(file, rank);
-                if (p.Type == PieceType.King && p.Color == color)
-                {
-                    return (file, rank);
-                }
+                if (p.Type == PieceType.King && p.Color == color) return (file, rank);
             }
         }
         return (-1, -1);

@@ -1,30 +1,27 @@
 using Aya;
 
-Console.WriteLine("Aya - Chess Engine (Evaluation Test)");
-Console.WriteLine("------------------------------------");
+Console.WriteLine("Aya - Chess Engine (Game Status Test)");
+Console.WriteLine("-------------------------------------");
 
 var board = new Board();
-var evaluator = new Evaluator();
+var generator = new MoveGenerator(board);
 
-Console.WriteLine("Initial Position Evaluation:");
+// 1. Checkmate test (Scholar's Mate)
+Console.WriteLine("\nTesting Checkmate (Scholar's Mate):");
+board.LoadFromFen("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4");
+var mateMove = new Move(5, 2, 5, 6); // f3 to f7
+board.MakeMove(mateMove);
 board.Print();
-Console.WriteLine($"Score: {evaluator.Evaluate(board)} (Positive: White favor, Negative: Black favor)");
+Console.WriteLine($"Status: {generator.GetGameStatus()}");
 
-// Move Knight to center
-var nf3 = new Move(6, 0, 5, 2); // g1 to f3
-Console.WriteLine("\nAfter g1f3 (Knight to center):");
-board.MakeMove(nf3);
+// 2. Stalemate test (Rei em a8, Dama em c7, Rei em a6)
+Console.WriteLine("\nTesting Stalemate:");
+board.LoadFromFen("k7/2Q5/K7/8/8/8/8/8 b - - 0 1");
 board.Print();
-Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
+Console.WriteLine($"Status: {generator.GetGameStatus()}");
 
-// Capture test
-board.LoadFromFen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
-Console.WriteLine("\nPosition before capture (e4 d5):");
+// 3. Insufficient Material test
+Console.WriteLine("\nTesting Insufficient Material:");
+board.LoadFromFen("k7/8/K7/8/8/8/8/8 w - - 0 1");
 board.Print();
-Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
-
-var exd5 = new Move(4, 3, 3, 4); // e4xd5
-Console.WriteLine("\nAfter exd5 (White captures pawn):");
-board.MakeMove(exd5);
-board.Print();
-Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
+Console.WriteLine($"Status: {generator.GetGameStatus()}");
