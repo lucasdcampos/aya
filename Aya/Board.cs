@@ -28,16 +28,13 @@ public class Board
         string[] parts = fen.Split(' ');
         if (parts.Length < 1) return;
 
-        // 1. Piece placement
         ParsePiecePlacement(parts[0]);
 
-        // 2. Active color
         if (parts.Length > 1)
         {
             ActiveColor = parts[1] == "w" ? PieceColor.White : PieceColor.Black;
         }
 
-        // 3. Castling availability
         if (parts.Length > 2)
         {
             string castling = parts[2];
@@ -47,7 +44,6 @@ public class Board
             BlackCanCastleQueenSide = castling.Contains('q');
         }
 
-        // 4. En passant target square
         if (parts.Length > 3)
         {
             string ep = parts[3];
@@ -63,13 +59,11 @@ public class Board
             }
         }
 
-        // 5. Halfmove clock
         if (parts.Length > 4 && int.TryParse(parts[4], out int halfmove))
         {
             HalfmoveClock = halfmove;
         }
 
-        // 6. Fullmove number
         if (parts.Length > 5 && int.TryParse(parts[5], out int fullmove))
         {
             FullmoveNumber = fullmove;
@@ -86,7 +80,7 @@ public class Board
         for (int rank = 0; rank < 8; rank++)
         {
             int file = 0;
-            string rankStr = ranks[7 - rank]; // FEN starts from rank 8
+            string rankStr = ranks[7 - rank];
 
             foreach (char c in rankStr)
             {
