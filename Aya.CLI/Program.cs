@@ -1,34 +1,30 @@
 using Aya;
 
-Console.WriteLine("Aya - Chess Engine");
-Console.WriteLine("------------------");
+Console.WriteLine("Aya - Chess Engine (Evaluation Test)");
+Console.WriteLine("------------------------------------");
 
 var board = new Board();
-var moveGenerator = new MoveGenerator(board);
+var evaluator = new Evaluator();
 
-Console.WriteLine("Initial Position:");
+Console.WriteLine("Initial Position Evaluation:");
 board.Print();
+Console.WriteLine($"Score: {evaluator.Evaluate(board)} (Positive: White favor, Negative: Black favor)");
 
-// Define some moves manually for testing
-// e2 (4,1) to e4 (4,3)
-var e2e4 = new Move(4, 1, 4, 3);
-// e7 (4,6) to e5 (4,4)
-var e7e5 = new Move(4, 6, 4, 4);
-
-Console.WriteLine("\nMaking move: e2e4");
-board.MakeMove(e2e4);
+// Move Knight to center
+var nf3 = new Move(6, 0, 5, 2); // g1 to f3
+Console.WriteLine("\nAfter g1f3 (Knight to center):");
+board.MakeMove(nf3);
 board.Print();
+Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
 
-Console.WriteLine("\nMaking move: e7e5");
-board.MakeMove(e7e5);
+// Capture test
+board.LoadFromFen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2");
+Console.WriteLine("\nPosition before capture (e4 d5):");
 board.Print();
+Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
 
-Console.WriteLine("\nUndoing move: e7e5");
-board.UndoMove(e7e5);
+var exd5 = new Move(4, 3, 3, 4); // e4xd5
+Console.WriteLine("\nAfter exd5 (White captures pawn):");
+board.MakeMove(exd5);
 board.Print();
-
-Console.WriteLine("\nUndoing move: e2e4");
-board.UndoMove(e2e4);
-board.Print();
-
-Console.WriteLine("\nFinal check - Position should be back to initial.");
+Console.WriteLine($"Score: {evaluator.Evaluate(board)}");
