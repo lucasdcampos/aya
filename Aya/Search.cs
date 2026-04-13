@@ -23,7 +23,6 @@ public class Search
         NodesEvaluated = 0;
         UsedBook = false;
 
-        // 1. Check Opening Book
         string? bookMoveStr = OpeningBook.GetMove(_board.GetCurrentFen());
         if (bookMoveStr != null)
         {
@@ -38,9 +37,11 @@ public class Search
             }
         }
         
-        // 2. Regular Search if no book move
         var allLegalMoves = _generator.GenerateLegalMoves().ToList();
         if (!allLegalMoves.Any()) return 0;
+
+        // Order moves at the root
+        var orderedMoves = OrderMoves(allLegalMoves);
 
         int alpha = int.MinValue + 1;
         int beta = int.MaxValue - 1;
@@ -49,7 +50,7 @@ public class Search
         if (maximizing)
         {
             int maxEval = int.MinValue + 1;
-            foreach (var move in allLegalMoves)
+            foreach (var move in orderedMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, false);
@@ -67,7 +68,7 @@ public class Search
         else
         {
             int minEval = int.MaxValue - 1;
-            foreach (var move in allLegalMoves)
+            foreach (var move in orderedMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, true);
@@ -104,10 +105,13 @@ public class Search
             return _evaluator.Evaluate(_board);
         }
 
+        // Apply Move Ordering
+        var orderedMoves = OrderMoves(legalMoves);
+
         if (maximizingPlayer)
         {
             int maxEval = int.MinValue + 1;
-            foreach (var move in legalMoves)
+            foreach (var move in orderedMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, false);
@@ -121,7 +125,7 @@ public class Search
         else
         {
             int minEval = int.MaxValue - 1;
-            foreach (var move in legalMoves)
+            foreach (var move in orderedMoves)
             {
                 _board.MakeMove(move);
                 int eval = AlphaBeta(depth - 1, alpha, beta, true);
@@ -132,6 +136,46 @@ public class Search
             }
             return minEval;
         }
+    }
+
+    private IEnumerable<Move> OrderMoves(IEnumerable<Move> moves)
+    {
+        return moves.OrderByDescending(move => ScoreMove(move));
+    }
+
+    private int ScoreMove(Move move)
+    {
+        int score = 0;
+        Piece movingPiece = _board.GetPiece(move.FromFile, move.FromRank);
+        Piece targetPiece = _board.GetPiece(move.ToFile, move.ToRank);
+
+        // 1. MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
+        if (targetPiece.Type != PieceType.None)
+        {
+            score = 10 * GetPieceValue(targetPiece.Type) - GetPieceValue(movingPiece.Type);
+        }
+
+        // 2. Promotions are good
+        if (move.Flag == MoveFlag.Promotion)
+        {
+            score += GetPieceValue(move.PromotionType);
+        }
+
+        return score;
+    }
+
+    private int GetPieceValue(PieceType type)
+    {
+        return type switch
+        {
+            PieceType.Pawn => 100,
+            PieceType.Knight => 320,
+            PieceType.Bishop => 330,
+            PieceType.Rook => 500,
+            PieceType.Queen => 900,
+            PieceType.King => 20000,
+            _ => 0
+        };
     }
 
     private (int file, int rank) FindKing(PieceColor color)

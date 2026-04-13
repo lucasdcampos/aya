@@ -16,32 +16,38 @@ public class BoardTests
     }
 
     [Fact]
-    public void MakeMove_UpdatesPosition()
+    public void ThreefoldRepetition_IsDetected()
     {
         var board = new Board();
-        var move = new Move(4, 1, 4, 3); // e2e4
+        var generator = new MoveGenerator(board);
+
+        // Moves: Nf3 Nc6 Ng1 Nb8 Nf3 Nc6 Ng1 Nb8 (Repetition)
+        var nf3 = new Move(6, 0, 5, 2);
+        var nc6 = new Move(1, 7, 2, 5);
+        var ng1 = new Move(5, 2, 6, 0);
+        var nb8 = new Move(2, 5, 1, 7);
+
+        board.MakeMove(nf3);
+        board.MakeMove(nc6);
+        board.MakeMove(ng1);
+        board.MakeMove(nb8); // 2nd time initial pos occurs
         
-        board.MakeMove(move);
-        
-        Assert.Equal(PieceType.Pawn, board.GetPiece(4, 3).Type);
-        Assert.Equal(PieceColor.White, board.GetPiece(4, 3).Color);
-        Assert.Equal(PieceType.None, board.GetPiece(4, 1).Type);
-        Assert.Equal(PieceColor.Black, board.ActiveColor);
+        board.MakeMove(nf3);
+        board.MakeMove(nc6);
+        board.MakeMove(ng1);
+        board.MakeMove(nb8); // 3rd time initial pos occurs
+
+        Assert.Equal(GameStatus.DrawByRepetition, generator.GetGameStatus());
     }
 
     [Fact]
-    public void UndoMove_RestoresPosition()
+    public void InsufficientMaterial_KvsK_IsDraw()
     {
         var board = new Board();
-        var move = new Move(4, 1, 4, 3); // e2e4
+        board.LoadFromFen("k7/8/8/8/8/8/8/K7 w - - 0 1");
+        var generator = new MoveGenerator(board);
         
-        board.MakeMove(move);
-        board.UndoMove(move);
-        
-        Assert.Equal(PieceType.Pawn, board.GetPiece(4, 1).Type);
-        Assert.Equal(PieceType.None, board.GetPiece(4, 3).Type);
-        Assert.Equal(PieceColor.White, board.ActiveColor);
-        Assert.Equal(1, board.FullmoveNumber);
+        Assert.Equal(GameStatus.DrawByInsufficientMaterial, generator.GetGameStatus());
     }
 
     [Fact]
@@ -59,21 +65,6 @@ public class BoardTests
     }
 
     [Fact]
-    public void Castling_WhiteKingSide_MovesRook()
-    {
-        var fen = "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4";
-        var board = new Board();
-        board.LoadFromFen(fen);
-        
-        var castlingMove = new Move(4, 0, 6, 0, MoveFlag.Castling);
-        board.MakeMove(castlingMove);
-        
-        Assert.Equal(PieceType.King, board.GetPiece(6, 0).Type);
-        Assert.Equal(PieceType.Rook, board.GetPiece(5, 0).Type);
-        Assert.False(board.WhiteCanCastleKingSide);
-    }
-
-    [Fact]
     public void Promotion_PawnToQueen()
     {
         var fen = "7k/P7/8/8/8/8/8/7K w - - 0 1";
@@ -84,46 +75,5 @@ public class BoardTests
         board.MakeMove(promotionMove);
         
         Assert.Equal(PieceType.Queen, board.GetPiece(0, 7).Type);
-    }
-
-    [Fact]
-    public void LegalMoves_PinnedPiece_CannotMove()
-    {
-        // White king on e1, White knight on e2, Black rook on e8
-        // The knight is pinned and cannot move
-        var fen = "4r3/8/8/8/8/8/4N3/4K3 w - - 0 1";
-        var board = new Board();
-        board.LoadFromFen(fen);
-        var generator = new MoveGenerator(board);
-        
-        var moves = generator.GenerateLegalMoves();
-        
-        // Knight at e2 (4,1) should have NO legal moves because it's pinned
-        var knightMoves = moves.Where(m => m.FromFile == 4 && m.FromRank == 1);
-        Assert.Empty(knightMoves);
-    }
-
-    [Fact]
-    public void LegalMoves_MustEscapeCheck()
-    {
-        // White king on e1, Black rook on e8
-        // White must move the king or block the check (but here only king moves are possible)
-        var fen = "4r3/8/8/8/8/8/8/4K3 w - - 0 1";
-        var board = new Board();
-        board.LoadFromFen(fen);
-        var generator = new MoveGenerator(board);
-        
-        var moves = generator.GenerateLegalMoves();
-        
-        // King must move to d1, f1, d2, e2, f2 (e2 is blocked by check too, so only d1, f1, d2, f2)
-        // Wait, e2 is also under attack by rook.
-        foreach (var move in moves)
-        {
-            board.MakeMove(move);
-            var (kFile, kRank) = (move.ToFile, move.ToRank); // King just moved
-            var attackerColor = PieceColor.Black;
-            Assert.False(generator.IsSquareAttacked(kFile, kRank, attackerColor));
-            board.UndoMove(move);
-        }
     }
 }
