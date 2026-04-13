@@ -1,8 +1,8 @@
 import pygame
 import chess
-from constants import WIDTH, HEIGHT, SIDEBAR_WIDTH, SIDEBAR_COLOR, TEXT_COLOR, SUB_TEXT_COLOR
+from constants import WIDTH, HEIGHT, SIDEBAR_WIDTH, SIDEBAR_COLOR, TEXT_COLOR, SUB_TEXT_COLOR, BUTTON_COLOR, BUTTON_HOVER_COLOR
 
-def draw_sidebar(screen, font, small_font, board, engine_info):
+def draw_sidebar(screen, font, small_font, board, engine_info, feedback_msg=""):
     sidebar_rect = pygame.Rect(WIDTH, 0, SIDEBAR_WIDTH, HEIGHT)
     pygame.draw.rect(screen, SIDEBAR_COLOR, sidebar_rect)
 
@@ -12,6 +12,21 @@ def draw_sidebar(screen, font, small_font, board, engine_info):
     title_surface = font.render("Aya Chess Engine", True, TEXT_COLOR)
     screen.blit(title_surface, (WIDTH + 20, y_offset))
     y_offset += 50
+
+    # Engine Names
+    white_name = engine_info.get("white_name", "White")
+    black_name = engine_info.get("black_name", "Black")
+    
+    # Highlight who is moving
+    w_color = TEXT_COLOR if board.turn == chess.WHITE else SUB_TEXT_COLOR
+    b_color = TEXT_COLOR if board.turn == chess.BLACK else SUB_TEXT_COLOR
+    
+    w_surface = small_font.render(f"W: {white_name}", True, w_color)
+    b_surface = small_font.render(f"B: {black_name}", True, b_color)
+    
+    screen.blit(w_surface, (WIDTH + 20, y_offset))
+    screen.blit(b_surface, (WIDTH + 20, y_offset + 25))
+    y_offset += 65
 
     # Status
     turn_text = "White to move" if board.turn == chess.WHITE else "Black to move (Thinking...)"
@@ -57,6 +72,30 @@ def draw_sidebar(screen, font, small_font, board, engine_info):
         x_pos = WIDTH + 20 + (140 if i % 2 != 0 else 0)
         row_y = y_offset + ((i - start_idx) // 2) * 25
         screen.blit(move_surface, (x_pos, row_y))
+
+    # Feedback Message (e.g., "PGN Copied!")
+    if feedback_msg:
+        msg_surface = small_font.render(feedback_msg, True, (0, 255, 0)) # Green
+        screen.blit(msg_surface, (WIDTH + 20, HEIGHT - 140))
+
+    # Buttons
+    mouse_pos = pygame.mouse.get_pos()
+    
+    # 1. Copy PGN Button
+    copy_button_rect = pygame.Rect(WIDTH + 20, HEIGHT - 110, SIDEBAR_WIDTH - 40, 40)
+    copy_color = BUTTON_HOVER_COLOR if copy_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+    pygame.draw.rect(screen, copy_color, copy_button_rect, border_radius=5)
+    copy_text = small_font.render("Copy PGN", True, TEXT_COLOR)
+    screen.blit(copy_text, copy_text.get_rect(center=copy_button_rect.center))
+
+    # 2. Export PGN Button
+    export_button_rect = pygame.Rect(WIDTH + 20, HEIGHT - 60, SIDEBAR_WIDTH - 40, 40)
+    export_color = BUTTON_HOVER_COLOR if export_button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+    pygame.draw.rect(screen, export_color, export_button_rect, border_radius=5)
+    export_text = small_font.render("Export PGN", True, TEXT_COLOR)
+    screen.blit(export_text, export_text.get_rect(center=export_button_rect.center))
+    
+    return copy_button_rect, export_button_rect
 
 def draw_game_over(screen, board, WIDTH, HEIGHT):
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)

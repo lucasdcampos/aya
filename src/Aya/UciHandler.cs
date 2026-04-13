@@ -79,11 +79,16 @@ public class UciHandler
             for (int i = movesIndex + 1; i < parts.Length; i++)
             {
                 string uciMove = parts[i];
-                var legalMoves = _generator.GenerateLegalMoves();
+                var legalMoves = _generator.GenerateLegalMoves().ToList();
                 var move = legalMoves.FirstOrDefault(m => m.ToString() == uciMove);
                 if (!move.Equals(default(Move)))
                 {
                     _board.MakeMove(move);
+                }
+                else
+                {
+                    // This is critical: if we miss a move, our internal board is wrong
+                    Console.Error.WriteLine($"info string Error: Illegal move received or not recognized: {uciMove}");
                 }
             }
         }

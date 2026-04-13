@@ -28,3 +28,5 @@ MOVE_DOT_COLOR = (0, 0, 0, 30) # Subtle dot for legal moves
 SIDEBAR_COLOR = pygame.Color("#262421")
 TEXT_COLOR = pygame.Color("#ffffff")
 SUB_TEXT_COLOR = pygame.Color("#ababab")
+BUTTON_COLOR = pygame.Color("#45423e")
+BUTTON_HOVER_COLOR = pygame.Color("#55524e")
