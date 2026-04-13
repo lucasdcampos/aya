@@ -3,7 +3,8 @@ namespace Aya;
 public class Board
 {
     private readonly Piece[,] _squares = new Piece[8, 8];
-
+    private readonly Stack<GameState> _history = new();
+    
     public PieceColor ActiveColor { get; private set; }
     public bool WhiteCanCastleKingSide { get; private set; }
     public bool WhiteCanCastleQueenSide { get; private set; }
@@ -70,6 +71,73 @@ public class Board
         }
     }
 
+    public void MakeMove(Move move)
+    {
+        Piece piece = _squares[move.FromFile, move.FromRank];
+        Piece target = _squares[move.ToFile, move.ToRank];
+
+        // Save current state
+        _history.Push(new GameState(
+            target,
+            WhiteCanCastleKingSide, WhiteCanCastleQueenSide,
+            BlackCanCastleKingSide, BlackCanCastleQueenSide,
+            EnPassantFile, EnPassantRank, HalfmoveClock
+        ));
+
+        // Execute move
+        _squares[move.ToFile, move.ToRank] = piece;
+        _squares[move.FromFile, move.FromRank] = Piece.Empty;
+
+        // Reset En Passant for next move
+        EnPassantFile = -1;
+        EnPassantRank = -1;
+
+        // Update counters
+        if (piece.Type == PieceType.Pawn || target.Type != PieceType.None)
+        {
+            HalfmoveClock = 0;
+        }
+        else
+        {
+            HalfmoveClock++;
+        }
+
+        if (ActiveColor == PieceColor.Black)
+        {
+            FullmoveNumber++;
+        }
+
+        ActiveColor = ActiveColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
+    }
+
+    public void UndoMove(Move move)
+    {
+        if (_history.Count == 0) return;
+
+        GameState state = _history.Pop();
+        Piece movedPiece = _squares[move.ToFile, move.ToRank];
+
+        // Restore pieces
+        _squares[move.FromFile, move.FromRank] = movedPiece;
+        _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
+
+        // Restore state
+        WhiteCanCastleKingSide = state.WhiteCanCastleKingSide;
+        WhiteCanCastleQueenSide = state.WhiteCanCastleQueenSide;
+        BlackCanCastleKingSide = state.BlackCanCastleKingSide;
+        BlackCanCastleQueenSide = state.BlackCanCastleQueenSide;
+        EnPassantFile = state.EnPassantFile;
+        EnPassantRank = state.EnPassantRank;
+        HalfmoveClock = state.HalfmoveClock;
+
+        ActiveColor = ActiveColor == PieceColor.White ? PieceColor.Black : PieceColor.White;
+
+        if (ActiveColor == PieceColor.Black)
+        {
+            FullmoveNumber--;
+        }
+    }
+
     private void ParsePiecePlacement(string placement)
     {
         for (int i = 0; i < 8; i++)
@@ -125,6 +193,7 @@ public class Board
             Console.WriteLine();
         }
         Console.WriteLine("  a b c d e f g h");
-        Console.WriteLine($"Turn: {ActiveColor}, Castling: {(WhiteCanCastleKingSide ? "K" : "")}{(WhiteCanCastleQueenSide ? "Q" : "")}{(BlackCanCastleKingSide ? "k" : "")}{(BlackCanCastleQueenSide ? "q" : "")}");
+        Console.WriteLine($"Turn: {ActiveColor}, Fullmove: {FullmoveNumber}, Halfmove: {HalfmoveClock}");
+        Console.WriteLine($"Castling: {(WhiteCanCastleKingSide ? "K" : "")}{(WhiteCanCastleQueenSide ? "Q" : "")}{(BlackCanCastleKingSide ? "k" : "")}{(BlackCanCastleQueenSide ? "q" : "")}");
     }
 }
