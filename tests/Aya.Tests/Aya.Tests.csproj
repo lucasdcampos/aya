@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Aya\Aya.csproj" />
+    <ProjectReference Include="../../src/Aya/Aya.csproj" />
   </ItemGroup>
 
 </Project>
