@@ -74,11 +74,17 @@ public class Board
     public void MakeMove(Move move)
     {
         Piece piece = _squares[move.FromFile, move.FromRank];
-        Piece target = _squares[move.ToFile, move.ToRank];
+        Piece capturedPiece = _squares[move.ToFile, move.ToRank];
+
+        if (move.Flag == MoveFlag.EnPassant)
+        {
+            // The captured pawn is on the same file as the destination, but on the starting rank
+            capturedPiece = _squares[move.ToFile, move.FromRank];
+        }
 
         // Save current state
         _history.Push(new GameState(
-            target,
+            capturedPiece,
             WhiteCanCastleKingSide, WhiteCanCastleQueenSide,
             BlackCanCastleKingSide, BlackCanCastleQueenSide,
             EnPassantFile, EnPassantRank, HalfmoveClock
@@ -88,12 +94,25 @@ public class Board
         _squares[move.ToFile, move.ToRank] = piece;
         _squares[move.FromFile, move.FromRank] = Piece.Empty;
 
-        // Reset En Passant for next move
+        if (move.Flag == MoveFlag.EnPassant)
+        {
+            _squares[move.ToFile, move.FromRank] = Piece.Empty;
+        }
+
+        // Update En Passant for next move
+        int oldEpFile = EnPassantFile;
+        int oldEpRank = EnPassantRank;
         EnPassantFile = -1;
         EnPassantRank = -1;
 
+        if (piece.Type == PieceType.Pawn && Math.Abs(move.ToRank - move.FromRank) == 2)
+        {
+            EnPassantFile = move.FromFile;
+            EnPassantRank = (move.FromRank + move.ToRank) / 2;
+        }
+
         // Update counters
-        if (piece.Type == PieceType.Pawn || target.Type != PieceType.None)
+        if (piece.Type == PieceType.Pawn || capturedPiece.Type != PieceType.None)
         {
             HalfmoveClock = 0;
         }
@@ -119,7 +138,16 @@ public class Board
 
         // Restore pieces
         _squares[move.FromFile, move.FromRank] = movedPiece;
-        _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
+        _squares[move.ToFile, move.ToRank] = Piece.Empty;
+
+        if (move.Flag == MoveFlag.EnPassant)
+        {
+            _squares[move.ToFile, move.FromRank] = state.CapturedPiece;
+        }
+        else
+        {
+            _squares[move.ToFile, move.ToRank] = state.CapturedPiece;
+        }
 
         // Restore state
         WhiteCanCastleKingSide = state.WhiteCanCastleKingSide;
@@ -193,7 +221,7 @@ public class Board
             Console.WriteLine();
         }
         Console.WriteLine("  a b c d e f g h");
-        Console.WriteLine($"Turn: {ActiveColor}, Fullmove: {FullmoveNumber}, Halfmove: {HalfmoveClock}");
+        Console.WriteLine($"Turn: {ActiveColor}, Fullmove: {FullmoveNumber}, EP: {(EnPassantFile == -1 ? "-" : $"{(char)('a' + EnPassantFile)}{EnPassantRank + 1}")}");
         Console.WriteLine($"Castling: {(WhiteCanCastleKingSide ? "K" : "")}{(WhiteCanCastleQueenSide ? "Q" : "")}{(BlackCanCastleKingSide ? "k" : "")}{(BlackCanCastleQueenSide ? "q" : "")}");
     }
 }

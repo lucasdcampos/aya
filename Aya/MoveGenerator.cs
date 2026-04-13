@@ -77,9 +77,16 @@ public class MoveGenerator
             if (IsOnBoard(capFile, nextRank))
             {
                 Piece target = _board.GetPiece(capFile, nextRank);
+                
+                // Normal capture
                 if (target.Type != PieceType.None && target.Color != color)
                 {
                     _moves.Add(new Move(file, rank, capFile, nextRank));
+                }
+                // En Passant capture
+                else if (capFile == _board.EnPassantFile && nextRank == _board.EnPassantRank)
+                {
+                    _moves.Add(new Move(file, rank, capFile, nextRank, MoveFlag.EnPassant));
                 }
             }
         }
