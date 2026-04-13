@@ -1,0 +1,104 @@
+using System;
+using System.Linq;
+
+namespace Aya;
+
+public class UciHandler
+{
+    private Board _board = new();
+    private MoveGenerator _generator;
+    private Search _search;
+
+    public UciHandler()
+    {
+        _generator = new MoveGenerator(_board);
+        _search = new Search(_board);
+    }
+
+    public void Run()
+    {
+        while (true)
+        {
+            string? line = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string command = parts[0].ToLower();
+
+            switch (command)
+            {
+                case "uci":
+                    HandleUci();
+                    break;
+                case "isready":
+                    Console.WriteLine("readyok");
+                    break;
+                case "ucinewgame":
+                    _board = new Board();
+                    _generator = new MoveGenerator(_board);
+                    _search = new Search(_board);
+                    break;
+                case "position":
+                    HandlePosition(parts);
+                    break;
+                case "go":
+                    HandleGo(parts);
+                    break;
+                case "quit":
+                    return;
+            }
+        }
+    }
+
+    private void HandleUci()
+    {
+        Console.WriteLine("id name Aya");
+        Console.WriteLine("id author Lucas Campos");
+        Console.WriteLine("uciok");
+    }
+
+    private void HandlePosition(string[] parts)
+    {
+        // position [fen <fenstring> | startpos] moves <move1> .... <moveN>
+        int movesIndex = Array.IndexOf(parts, "moves");
+        
+        if (parts[1] == "startpos")
+        {
+            _board.LoadFromFen(Board.InitialFen);
+        }
+        else if (parts[1] == "fen")
+        {
+            // Reconstruct FEN string (parts 2 to movesIndex-1)
+            int end = movesIndex == -1 ? parts.Length : movesIndex;
+            string fen = string.Join(" ", parts.Skip(2).Take(end - 2));
+            _board.LoadFromFen(fen);
+        }
+
+        if (movesIndex != -1)
+        {
+            for (int i = movesIndex + 1; i < parts.Length; i++)
+            {
+                string uciMove = parts[i];
+                var legalMoves = _generator.GenerateLegalMoves();
+                var move = legalMoves.FirstOrDefault(m => m.ToString() == uciMove);
+                if (!move.Equals(default(Move)))
+                {
+                    _board.MakeMove(move);
+                }
+            }
+        }
+    }
+
+    private void HandleGo(string[] parts)
+    {
+        int depth = 4; // Default depth
+        int depthIndex = Array.IndexOf(parts, "depth");
+        if (depthIndex != -1 && depthIndex + 1 < parts.Length)
+        {
+            int.TryParse(parts[depthIndex + 1], out depth);
+        }
+
+        _search.StartSearch(depth);
+        Console.WriteLine($"bestmove {_search.BestMove}");
+    }
+}
