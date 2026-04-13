@@ -99,10 +99,11 @@ public class UciHandler
         }
 
         int score = _search.StartSearch(depth);
-        bool isWhite = _board.ActiveColor == PieceColor.White;
-        int uciScore = isWhite ? score : -score;
         
-        // Output UCI info string (always before bestmove)
+        // score is absolute (Positive = White better)
+        // UCI expects score relative to side to move
+        int uciScore = (_board.ActiveColor == PieceColor.White) ? score : -score;
+        
         Console.WriteLine($"info depth {depth} score cp {uciScore} nodes {Math.Max(1, _search.NodesEvaluated)} pv {_search.BestMove}");
         Console.WriteLine($"bestmove {_search.BestMove}");
     }

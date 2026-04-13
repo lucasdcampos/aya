@@ -152,8 +152,8 @@ def main():
                 if result.info:
                     info = result.info
                     if "score" in info:
-                        score_obj = info["score"].white()
-                        engine_info["score"] = score_obj.score(mate_score=100000)
+                        # Normalize to White perspective: positive = white winning
+                        engine_info["score"] = info["score"].white().score(mate_score=100000)
                     if "nodes" in info:
                         engine_info["nodes"] = info["nodes"]
                     if "pv" in info:
