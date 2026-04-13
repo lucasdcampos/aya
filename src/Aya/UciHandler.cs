@@ -98,7 +98,12 @@ public class UciHandler
             int.TryParse(parts[depthIndex + 1], out depth);
         }
 
-        _search.StartSearch(depth);
+        int score = _search.StartSearch(depth);
+        bool isWhite = _board.ActiveColor == PieceColor.White;
+        int uciScore = isWhite ? score : -score;
+        
+        // Output UCI info string (always before bestmove)
+        Console.WriteLine($"info depth {depth} score cp {uciScore} nodes {Math.Max(1, _search.NodesEvaluated)} pv {_search.BestMove}");
         Console.WriteLine($"bestmove {_search.BestMove}");
     }
 }

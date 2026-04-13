@@ -40,6 +40,9 @@ public class Search
         var allLegalMoves = _generator.GenerateLegalMoves().ToList();
         if (!allLegalMoves.Any()) return 0;
 
+        // Ensure we have a default best move in case all evals are equal
+        BestMove = allLegalMoves[0];
+
         // Order moves at the root
         var orderedMoves = OrderMoves(allLegalMoves);
 
